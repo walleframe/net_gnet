@@ -1,0 +1,132 @@
+* net_gnet
+gnet network support
+
+
+** gnet选项 - io层
+[[./example/gnet][gnet例子]]
+gnet 当前客户端支持正在开发（dev分支，还有问题，暂时可以使用gotcp）
+
+gnet层封装 支持大部分原始gnet包的配置（日志除外，之后会在walle日志修改时进行统一）
+
+*** server 选项
+#+begin_src go
+// ServerOption
+//go:generate gogen option -n ServerOption -o option.server.go
+func walleServer() interface{} {
+	return map[string]interface{}{
+		// Addr Server Addr
+		"Addr": string("tcp://0.0.0.0:8080"),
+		// NetOption modify raw options
+		"NetConnOption": func(net.Conn) {},
+		// accepted load limit
+		"AcceptLoadLimit": func(sess Session, cnt int64) bool { return false },
+		// Process Options
+		"ProcessOptions": []process.ProcessOption{},
+		// process router
+		"Router": Router(nil),
+		// SessionRouter custom session router
+		"SessionRouter": func(sess Session, global Router) (r Router) { return global },
+		// log interface
+		"Logger": (*zaplog.Logger)(zaplog.Default),
+		// SessionLogger custom session logger
+		"SessionLogger": func(sess Session, global *zaplog.Logger) (r *zaplog.Logger) { return global },
+		// NewSession custom session
+		"NewSession": func(in Session) (Session, error) { return in, nil },
+		// StopImmediately when session finish,business finish immediately.
+		"StopImmediately": false,
+		// Heartbeat use websocket ping/pong.
+		"Heartbeat": time.Duration(0),
+		// WithMulticore sets up multi-cores in gnet server.
+		"Multicore": false,
+		// WithLockOSThread sets up LockOSThread mode for I/O event-loops.
+		"LockOSThread": false,
+		// WithLoadBalancing sets up the load-balancing algorithm in gnet server.
+		"LoadBalancing": gnet.LoadBalancing(gnet.SourceAddrHash),
+		// WithNumEventLoop sets up NumEventLoop in gnet server.
+		"NumEventLoop": int(0),
+		// WithReusePort sets up SO_REUSEPORT socket option.
+		"ReusePort": false,
+		// WithTCPKeepAlive sets up the SO_KEEPALIVE socket option with duration.
+		"TCPKeepAlive": time.Duration(0),
+		// WithTCPNoDelay enable/disable the TCP_NODELAY socket option.
+		"TCPNoDelay": gnet.TCPSocketOpt(gnet.TCPNoDelay),
+		// WithReadBufferCap sets up ReadBufferCap for reading bytes.
+		"ReadBufferCap": int(0),
+		// WithSocketRecvBuffer sets the maximum socket receive buffer in bytes.
+		"SocketRecvBuffer": int(0),
+		// WithSocketSendBuffer sets the maximum socket send buffer in bytes.
+		"SocketSendBuffer": int(0),
+		// WithTicker indicates that a ticker is set.
+		"Ticker": time.Duration(0),
+		// WithCodec sets up a codec to handle TCP stream.
+		"Codec": gnet.ICodec(gnet.ICodec(DefaultGNetCodec)),
+	}
+}
+#+end_src
+
+*** 服务器
+#+begin_src go
+package main
+
+import (
+	"fmt"
+
+	"github.com/walleframe/net_gnet"
+	"github.com/walleframe/walle/process"
+	"github.com/walleframe/walle/testpkg/wpb"
+	"github.com/walleframe/walle/zaplog"
+)
+
+func main() {
+	p := 12345
+	fmt.Println("port:", p)
+
+	zaplog.SetFrameLogger(zaplog.NoopLogger)
+	zaplog.SetLogicLogger(zaplog.NoopLogger)
+	// zaplog.SetFrameLogger(zaplog.GetLogicLogger())
+
+	wpb.RegisterWSvcService(process.GetRouter(), &wpb.WPBSvc{})
+	svc := net_gnet.NewServer(
+		net_gnet.WithReuseReadBuffer(true),
+	)
+	svc.Run(fmt.Sprintf(":%d", p))
+}
+
+#+end_src
+
+*** 客户端
+#+begin_src go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/walleframe/net_gnet"
+	"github.com/walleframe/walle/testpkg/wpb"
+	"github.com/walleframe/walle/util"
+	"github.com/walleframe/walle/zaplog"
+)
+
+func main() {
+	zaplog.SetFrameLogger(zaplog.NoopLogger)
+	zaplog.SetLogicLogger(zaplog.NoopLogger)
+	// zaplog.SetFrameLogger(zaplog.GetLogicLogger())
+
+	cli, err := net_gnet.NewClient(
+		net_gnet.WithClientOptionAddr(fmt.Sprintf("localhost:%d", 12345)),
+	)
+	if err != nil {
+		util.PanicIfError(err)
+	}
+	time.Sleep(time.Second)
+
+	wcli := wpb.NewWSvcClient(cli)
+	ctx := context.Background()
+
+	rs, err := wcli.Add(ctx, &wpb.AddRq{Params: []int64{100}})
+	fmt.Println(rs, err)
+}
+
+#+end_src
