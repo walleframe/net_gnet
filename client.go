@@ -318,7 +318,7 @@ type goClientContextPool struct {
 	sync.Pool
 }
 
-func (p *goClientContextPool) NewContext(inner *process.InnerOptions, opts *process.ProcessOptions, inPkg interface{}, handlers []process.MiddlewareFunc, loadFlag bool) process.Context {
+func (p *goClientContextPool) NewContext(inner *process.InnerOptions, opts *process.ProcessOptions, inPkg interface{}, handlers []process.MiddlewareFunc) process.Context {
 	ctx := p.Get().(*clientCtx)
 	ctx.Inner = inner
 	ctx.Opts = opts
@@ -326,7 +326,6 @@ func (p *goClientContextPool) NewContext(inner *process.InnerOptions, opts *proc
 	ctx.Index = 0
 	ctx.Handlers = handlers
 	ctx.InPkg = inPkg
-	ctx.LoadFlag = loadFlag
 	ctx.Log = opts.Logger
 	ctx.FreeContext = ctx
 	ctx.GNetClient = inner.BindData.(*GNetClient)

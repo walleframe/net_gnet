@@ -97,7 +97,6 @@ func walleServer() interface{} {
 // GNetServer impletion gnet.EventHandler
 type GNetServer struct {
 	acceptLoad atomic.Int64
-	pkgLoad    atomic.Int64
 	sequence   atomic.Int64
 	opts       *ServerOptions
 	procOpts   *process.ProcessOptions
@@ -334,7 +333,6 @@ func (svr *GNetServer) handleNewConn(conn gnet.Conn) {
 		svr:  svr,
 		RPCProcess: rpc.NewRPCProcess(
 			process.NewInnerOptions(
-				process.WithInnerOptionLoad(&svr.pkgLoad),
 				process.WithInnerOptionSequence(&svr.sequence),
 			),
 			process.NewProcessOptions(
